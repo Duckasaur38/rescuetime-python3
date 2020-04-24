@@ -20,7 +20,7 @@ class JSONInterface(object):
 
     @classmethod
     def from_json(cls, json):
-        return deserialize(json.decode('ascii'))
+        return deserialize(json.decode('utf-8'))
 
     @classmethod
     def for_response(cls, response = None, raw = False):
