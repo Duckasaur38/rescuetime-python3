@@ -13,7 +13,10 @@ class RTAnalyzer:
 
     def __init__(self, key=None, path=None):
         if key is None:
-            key = os.environ['RESCUETIME_KEY']
+            try:
+                key = os.environ['RESCUETIME_KEY']
+            except KeyError:
+                print('cant find key, no big deal. set self.key to fetch')
         self.key = key
         self.path = path
 
@@ -29,6 +32,12 @@ class RTAnalyzer:
     @property
     def date_range(self):
         return pd.date_range(self.df.date.min(), self.df.date.max())
+
+    @property
+    def dummy_df(self):
+        dummy_df = pd.DataFrame(dict(Date=self.date_range)).assign(T=0)
+        _add_cols(dummy_df)
+        return dummy_df
 
     def _fetch_one(self, start_date, end_date):
         p = {}
@@ -55,16 +64,55 @@ class RTAnalyzer:
 
         return df
 
-    def _add_cols(self):
+    def refresh(self):
+        #pd.date_range('2020-01-01', today)
+        raise NotImplementedError('partial dates?')
+
+    def clean_df(self):
         _add_cols(self.df)
+        update_jupyter_aliases_(self.df)
+        activity_21 = self.df['Activity']
+        activity_21.loc[~self.df.Activity.isin(FREQ)] = 'Misc.'
+        self.df['activity_21'] = activity_21
 
     def summary_type1(self, tgrouper='qstring', activity_grouper='Activity'):
         return summary_type_1(self.df, tgrouper=tgrouper, activity_grouper=activity_grouper)
 
     def daily_avg(self, grouper='qstring', df=None):
         _df = df if df is not None else self.df
-        return daily_avg(_df, grouper)
+        day_count = self.dummy_df.groupby(grouper)['date'].nunique()
+        hours = daily_avg(_df, grouper)
+        avg = hours/day_count
+        return avg
 
+    def pct_of_days(self, slice, tgrouper):
+        day_count = self.dummy_df.groupby(tgrouper)['date'].nunique()
+        ndays = slice.groupby(tgrouper)['date'].nunique()
+        return ndays.to_frame('n_days').assign(frac=ndays/day_count)
+
+    def productivity_cube(self, tgrouper='Month', col='Productivity'):
+        cube = self.groupby([tgrouper, col])[T].sum().unstack()
+        return (cube / 3600).round()
+
+    def __getattr__(self, item):
+        if item in self.__dict__:
+            return getattr(self, item)
+        else:
+            return getattr(self.df, item)
+
+    def __getitem__(self, item):
+        return self.df.__getitem__(item)
+
+    def __setitem__(self, item):
+        return self.df.__setitem__(item)
+FREQ = ['Evernote', 'Google Documents', 'Google Presentations',
+        'Google Spreadsheets', 'Jupyter Notebook', 'Preview', 'Slack',
+        'amazon.com', 'arxiv.org', 'espn.com', 'github.com', 'google chrome',
+        'google-chrome', 'google.com', 'google.com/calendar',
+        'inbox.google.com', 'iterm2', 'kaggle.com', 'messages', 'netflix.com',
+        'newtab', 'overleaf.com', 'phabricator.kensho.com', 'piazza.com',
+        'pycharm', 'quip', 'stanford-pilot.hosted.panopto.com', 'sublime text',
+        'superhuman', 'twitter.com', 'youtube.com']
 def _add_cols(df):
     df['date'] = pd.to_datetime(df.Date)
     df['year'] = df.date.dt.year
@@ -73,6 +121,17 @@ def _add_cols(df):
     df['Month'] = df.date.dt.strftime('%Y-%m')
     df['fake_grouper'] = 1
 
+def productivity_cube(self, tgrouper='Month', col='Productivity'):
+    cube = self.groupby([tgrouper, col])[T].sum().unstack()
+    return (cube / 3600).round()
+
+def update_jupyter_aliases_(df):
+    mask = df.Activity.str.startswith('localhost')
+    for suffix in [':8888', ':8889', ':8890', ':5555']:
+        mask = mask | df.Activity.str.endswith(suffix)
+    df.loc[mask, 'Activity']= 'Jupyter Notebook'
+    df.loc[df['Activity'] == 'Jupyter Notebook', 'Category'] = 'Jupyter Notebook'
+    df['Activity'] = df['Activity'].str.replace('google chrome', 'google-chrome')
 
 def summary_type_1(df, tgrouper='qstring', activity_grouper='Activity'):
     totals = df.groupby([tgrouper, activity_grouper])[T].sum().rename('hours') / 3600
@@ -91,6 +150,4 @@ JUPYTER_ALIASES = {
 
 def daily_avg(df, gb='qstring'):
     secs_per_hour = 3600
-    day_count = df.groupby(gb).date.nunique()
-    hours_per_day = (df.groupby(gb)[T].sum() / day_count) / secs_per_hour
-    return hours_per_day
+    return df.groupby(gb)[T].sum() / secs_per_hour # hours
