@@ -19,6 +19,7 @@ class RTAnalyzer:
                 print('cant find key, no big deal. set self.key to fetch')
         self.key = key
         self.path = path
+        self.s = None
 
     def fetch(self, **fetch_kwargs):
         self.df = self.fetch_df(**fetch_kwargs)
@@ -52,7 +53,8 @@ class RTAnalyzer:
         return df
 
     def fetch_df(self, start_date='2019-09-01', end_date=None) -> pd.DataFrame:
-        self.s = Service.Service()
+        if self.s is None:
+            self.s = Service.Service()
         self.k = AnalyticApiKey.AnalyticApiKey(self.key, self.s)
         if end_date is None:
             end_date = datetime.datetime.now().strftime('%Y-%m-%d')

@@ -9,7 +9,7 @@ from api.access.AnalyticApiKey import AnalyticApiKey
 from api.model.ResponseData import ResponseData
 
 # replace with your own, otherwise nothing will be returned.
-apikey = 'B63C4fZ0bQb6iu1EXYPMhsFLT_VqUhutPiu9fIwP'
+apikey = 'B63k_9eknFH32o51fXlckDm1JMwgLuYK3ptTOVOf'
 
 if __name__ == '__main__':
     s = Service()
